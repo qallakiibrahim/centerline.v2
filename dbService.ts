@@ -113,19 +113,29 @@ export class FirebaseDatabaseService implements DatabaseService {
 
   public async getData(): Promise<Record<string, any>> {
     const states: Record<string, any> = {};
-    const path = 'app_state';
+    const keys = ['points', 'layout', 'definitions', 'recipes', 'hierarchy', 'backgrounds', 'history'];
     
     try {
-      const querySnapshot = await getDocs(collection(db, path));
-      querySnapshot.forEach((docSnap) => {
-        const docData = docSnap.data();
-        if (docData && docData.key) {
-          states[docData.key] = docData.value;
+      const promises = keys.map(async (key) => {
+        const docRef = doc(db, 'app_state', key);
+        try {
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const docData = docSnap.data();
+            if (docData && docData.key) {
+              states[docData.key] = docData.value;
+            }
+          }
+        } catch (err) {
+          console.error(`Failed to read individual key '${key}' from Firestore:`, err);
+          handleFirestoreError(err, OperationType.GET, `app_state/${key}`);
         }
       });
+      
+      await Promise.all(promises);
       return states;
     } catch (error) {
-      handleFirestoreError(error, OperationType.GET, path);
+      handleFirestoreError(error, OperationType.GET, 'app_state');
       return {};
     }
   }
